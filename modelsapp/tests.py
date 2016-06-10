@@ -1,78 +1,89 @@
+import factory
 from django.test import TestCase
 
 from .models import Account, AccountingTransaction
 from .utils import make_transfer
 
 
+class AccountFactory(factory.django.DjangoModelFactory):
+    name = 'account name'
+    debit = 0
+    credit = 0
+
+    class Meta:
+        model = Account
+
+
+class AccountingTransactionFactory(factory.django.DjangoModelFactory):
+    amount = 0
+
+    debit = factory.SubFactory(AccountFactory)
+    credit = factory.SubFactory(AccountFactory)
+
+    class Meta:
+        model = AccountingTransaction
+
+
 class TransactionTest(TestCase):
+
+    def get_account(self, id):
+        return Account.objects.get(id=id)
+
+    def setUp(self):
+        pass
 
     def test_transaction_fail(self):
         amount = 200
         start_credit = 300
-        start_debit = 300
+        start_debit = 200
 
-        from_ = Account(name='name1', debit=start_debit, credit=start_credit)
-        from_.save()
-
-        to = Account(name='name2', debit=0, credit=0)
-        to.save()
-
-        trns = AccountingTransaction()
-        trns.amount = amount
-        trns.credit = from_
-        trns.debit = to
-        trns.save()
+        trns = AccountingTransactionFactory(
+            amount=amount,
+            credit__credit=start_credit,
+            credit__debit=start_debit,
+        )
 
         self.assertFalse(make_transfer(trns.id))
 
-        from_ = Account.objects.get(id=from_.id)
+        credit = self.get_account(trns.credit.id)
 
-        self.assertEqual(from_.debit, start_debit)
-        self.assertEqual(from_.credit, start_credit)
+        self.assertEqual(credit.debit, start_debit)
+        self.assertEqual(credit.credit, start_credit)
 
     def test_transaction_equal(self):
         amount = 200
         start_credit = 300
+        start_debit = 500
 
-        from_ = Account(name='name1', debit=500, credit=start_credit)
-        from_.save()
-        to = Account(name='name2', debit=0, credit=0)
-        to.save()
-        trns = AccountingTransaction()
-        trns.amount = amount
-        trns.credit = from_
-        trns.debit = to
-        trns.save()
+        trns = AccountingTransactionFactory(
+            amount=amount,
+            credit__credit=start_credit,
+            credit__debit=start_debit
+        )
+
         self.assertTrue(make_transfer(trns.id))
 
-        to = Account.objects.get(id=to.id)
-        self.assertTrue(to.debit == amount)
+        debit = self.get_account(trns.debit.id)
+        self.assertTrue(debit.debit == amount)
 
-        from_ = Account.objects.get(id=from_.id)
-
-        self.assertTrue(from_.credit == start_credit + amount)
+        credit = self.get_account(trns.credit.id)
+        self.assertEqual(credit.credit, start_credit + amount)
 
     def test_transaction_more(self):
         amount = 200
         start_credit = 300
+        start_debit = 600
 
-        from_ = Account(name='name1', debit=600, credit=start_credit)
-        from_.save()
-
-        to = Account(name='name2', debit=0, credit=0)
-        to.save()
-
-        trns = AccountingTransaction()
-        trns.amount = amount
-        trns.credit = from_
-        trns.debit = to
-        trns.save()
+        trns = AccountingTransactionFactory(
+            amount=amount,
+            credit__credit=start_credit,
+            credit__debit=start_debit
+        )
 
         self.assertTrue(make_transfer(trns.id))
 
-        to = Account.objects.get(id=to.id)
-        self.assertTrue(to.debit == amount)
+        debit = self.get_account(trns.debit.id)
+        self.assertTrue(debit.debit == amount)
 
-        from_ = Account.objects.get(id=from_.id)
-
-        self.assertEqual(from_.credit, start_credit + amount)
+        credit = self.get_account(trns.credit.id)
+        self.assertEqual(credit.credit, start_credit + amount)
